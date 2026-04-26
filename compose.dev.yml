@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:14.22-trixie
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: url_shortener
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres:5432/url_shortener
+    develop:
+      watch:
+        - action: "sync"
+          path: "./src"
+          target: "/app/src"
+volumes:
+  db_data:
