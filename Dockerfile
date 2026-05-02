@@ -13,8 +13,8 @@ RUN make build
 FROM debian:bookworm-slim
 
 WORKDIR /app
-COPY --from=builder /app/bin/url-shortener /app/url-shortener
+COPY --from=builder /app/bin/server /app/server
 
 EXPOSE 3001
-RUN chmod +x /app/url-shortener
-CMD ["/app/url-shortener"]
+RUN chmod +x /app/server
+CMD ["/app/server"]

@@ -13,3 +13,14 @@ type ShortURL struct {
 func (ShortURL) TableName() string {
 	return "short_urls"
 }
+
+type ShortenURLResponse struct {
+	Code        string `json:"code"`
+	OriginalURL string `json:"original_url"`
+	ShortURL    string `json:"short_url"`
+	ExpireAt    int64  `json:"expire_at"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}

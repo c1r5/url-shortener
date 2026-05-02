@@ -1,6 +1,7 @@
 package shortener
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -21,12 +22,22 @@ func (m *ShortenerModule) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", m.Redirect)
 }
 
+func writeJSON(w http.ResponseWriter, statusCode int, response any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(response)
+}
+
+func errorResponse(w http.ResponseWriter, statusCode int, message string) {
+	writeJSON(w, statusCode, ErrorResponse{Error: message})
+}
+
 func (m *ShortenerModule) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		originalURL := r.FormValue("url")
 		if originalURL == "" {
-			http.Error(w, "URL is required", http.StatusBadRequest)
+			errorResponse(w, http.StatusBadRequest, "URL is required")
 			return
 		}
 
@@ -38,20 +49,25 @@ func (m *ShortenerModule) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := m.db.Create(&shortURL).Error; err != nil {
-			http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
+			errorResponse(w, http.StatusInternalServerError, "Failed to create short URL")
 			return
 		}
 
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("Short URL created: " + code))
+		writeJSON(w, http.StatusCreated, ShortenURLResponse{
+			Code:        code,
+			OriginalURL: originalURL,
+			ShortURL:    "http://" + r.Host + "/" + code,
+			ExpireAt:    shortURL.ExpireAt,
+		})
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", http.MethodPost)
+		errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }
 
 func (m *ShortenerModule) Redirect(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
-		http.NotFound(w, r)
+		errorResponse(w, http.StatusNotFound, "Short URL not found")
 		return
 	}
 
@@ -61,7 +77,7 @@ func (m *ShortenerModule) Redirect(w http.ResponseWriter, r *http.Request) {
 		shortURL := ShortURL{}
 		result := m.db.Where("code = ?", code).First(&shortURL, "expire_at > ?", time.Now().Unix())
 		if result.Error != nil {
-			http.NotFound(w, r)
+			errorResponse(w, http.StatusNotFound, "Short URL not found")
 			return
 		}
 
@@ -69,6 +85,7 @@ func (m *ShortenerModule) Redirect(w http.ResponseWriter, r *http.Request) {
 		m.db.Model(&shortURL).UpdateColumn("clicks", gorm.Expr("clicks + ?", 1))
 
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", http.MethodGet)
+		errorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
 	}
 }

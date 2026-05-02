@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:14.22-trixie
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    image: debian:bookworm-slim
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres:${DB_PORT}/${DB_NAME}
+    ports:
+      - "${APP_PORT}:3001"
+    volumes:
+      - ./server:/app/server:ro
+    command: ["/app/server"]
+
+volumes:
+  db_data:
